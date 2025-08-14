@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCTE-35 HLS Checker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 15px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .input-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 2px solid #e9ecef;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .input-group input {
+            flex: 1;
+            min-width: 300px;
+            padding: 12px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .status.info {
+            background: #cce7ff;
+            border: 2px solid #007bff;
+            color: #0056b3;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+        }
+
+        .results {
+            background: #ffffff;
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid #e9ecef;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .results h3 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .scte35-item {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 2px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: transform 0.2s ease;
+        }
+
+        .scte35-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .scte35-item h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .scte35-detail {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 5px 0;
+            border-left: 4px solid #667eea;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .auto-refresh input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .countdown {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .playlist-info {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .playlist-info h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .no-scte35 {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 SCTE-35 HLS Checker</h1>
+            <p>ตรวจสอบ SCTE-35 messages จาก HLS playlist</p>
+        </div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <input type="url" id="hlsUrl" placeholder="ใส่ URL ของ HLS playlist (.m3u8)" 
+                       value="https://example.com/playlist.m3u8">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="checkSCTE35()">
+                    🔍 ตรวจสอบ SCTE-35
+                </button>
+                <button class="btn btn-secondary" onclick="clearResults()">
+                    🧹 ล้างผลลัพธ์
+                </button>
+            </div>
+            <div class="auto-refresh">
+                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+                <label for="autoRefresh">รีเฟรชอัตโนมัติทุก 5 วินาที</label>
+                <span id="countdown" class="countdown"></span>
+            </div>
+        </div>
+
+        <div id="status"></div>
+        <div id="results" class="results" style="display: none;"></div>
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+        let countdownInterval = null;
+        let countdownSeconds = 5;
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function clearResults() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('status').innerHTML = '';
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            document.getElementById('autoRefresh').checked = false;
+            document.getElementById('countdown').textContent = '';
+        }
+
+        async function fetchWithCORS(url) {
+            try {
+                // พยายาม fetch โดยตรงก่อน
+                const response = await fetch(url);
+                if (response.ok) {
+                    return await response.text();
+                }
+                throw new Error('Direct fetch failed');
+            } catch (error) {
+                // ถ้าไม่ได้ ให้ใช้ CORS proxy
+                const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+                try {
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return await response.text();
+                } catch (proxyError) {
+                    // ลองใช้ proxy อื่น
+                    const altProxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                    const altResponse = await fetch(altProxyUrl);
+                    if (!altResponse.ok) {
+                        throw new Error('ไม่สามารถดาวน์โหลด playlist ได้ เนื่องจาก CORS policy');
+                    }
+                    const data = await altResponse.json();
+                    return data.contents;
+                }
+            }
+        }
+
+        function parseSCTE35(playlistContent) {
+            const lines = playlistContent.split('\n');
+            const scte35Messages = [];
+            let currentSegment = null;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                // ตรวจสอบ EXT-X-SCTE35-OUT
+                if (line.startsWith('#EXT-X-SCTE35-OUT:')) {
+                    const match = line.match(/DURATION=([0-9.]+)/);
+                    const duration = match ? parseFloat(match[1]) : null;
+                    scte35Messages.push({
+                        type: 'SCTE35-OUT (Ad Break Start)',
+                        line: line,
+                        duration: duration,
+                        position: i + 1
+                    });
+                }
+                
+                // ตรวจสอบ EXT-X-SCTE35-IN
+                if (line.startsWith('#EXT-X-SCTE35-IN')) {
+                    scte35Messages.push({
+                        type: 'SCTE35-IN (Ad Break End)',
+                        line: line,
+                        position: i + 1
+                    });
+                }
+                
+                // ตรวจสอบ EXT-X-CUE-OUT
+                if (line.startsWith('#EXT-X-CUE-OUT:')) {
+                    const match = line.match(/([0-9.]+)/);
+                    const duration = match ? parseFloat(match[1]) : null;
+                    scte35Messages.push({
+                        type: 'CUE-OUT (Ad Break)',
+                        line: line,
+                        duration: duration,
+                        position: i + 1
+                    });
+                }
+                
+                // ตรวจสอบ EXT-X-CUE-IN
+                if (line.startsWith('#EXT-X-CUE-IN')) {
+                    scte35Messages.push({
+                        type: 'CUE-IN (Return to Program)',
+                        line: line,
+                        position: i + 1
+                    });
+                }
+                
+                // ตรวจสอบ EXT-X-DATERANGE
+                if (line.startsWith('#EXT-X-DATERANGE:')) {
+                    if (line.includes('SCTE35-OUT') || line.includes('SCTE35-IN') || line.includes('SCTE35-CMD')) {
+                        scte35Messages.push({
+                            type: 'DATERANGE SCTE35',
+                            line: line,
+                            position: i + 1
+                        });
+                    }
+                }
+                
+                // ตรวจสอบ segment files
+                if (line.endsWith('.ts') || line.endsWith('.m4s')) {
+                    currentSegment = line;
+                }
+            }
+
+            return scte35Messages;
+        }
+
+        function getPlaylistInfo(playlistContent) {
+            const lines = playlistContent.split('\n');
+            const info = {
+                version: null,
+                targetDuration: null,
+                mediaSequence: null,
+                segmentCount: 0,
+                playlistType: null
+            };
+
+            for (const line of lines) {
+                if (line.startsWith('#EXT-X-VERSION:')) {
+                    info.version = line.split(':')[1];
+                } else if (line.startsWith('#EXT-X-TARGETDURATION:')) {
+                    info.targetDuration = line.split(':')[1];
+                } else if (line.startsWith('#EXT-X-MEDIA-SEQUENCE:')) {
+                    info.mediaSequence = line.split(':')[1];
+                } else if (line.startsWith('#EXT-X-PLAYLIST-TYPE:')) {
+                    info.playlistType = line.split(':')[1];
+                } else if (line.endsWith('.ts') || line.endsWith('.m4s')) {
+                    info.segmentCount++;
+                }
+            }
+
+            return info;
+        }
+
+        async function checkSCTE35() {
+            const url = document.getElementById('hlsUrl').value.trim();
+            
+            if (!url) {
+                showStatus('❌ กรุณาใส่ URL ของ HLS playlist', 'error');
+                return;
+            }
+
+            showStatus('🔄 กำลังดาวน์โหลดและตรวจสอบ playlist... <span class="loading"></span>', 'info');
+
+            try {
+                const playlistContent = await fetchWithCORS(url);
+                
+                if (!playlistContent.includes('#EXTM3U')) {
+                    throw new Error('ไฟล์ที่ดาวน์โหลดไม่ใช่ M3U8 playlist ที่ถูกต้อง');
+                }
+
+                const scte35Messages = parseSCTE35(playlistContent);
+                const playlistInfo = getPlaylistInfo(playlistContent);
+                
+                displayResults(scte35Messages, playlistInfo, url);
+                
+                if (scte35Messages.length > 0) {
+                    showStatus(`✅ พบ SCTE-35 messages จำนวน ${scte35Messages.length} รายการ`, 'success');
+                } else {
+                    showStatus('⚠️ ไม่พบ SCTE-35 messages ใน playlist นี้', 'warning');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus(`❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+                document.getElementById('results').style.display = 'none';
+            }
+        }
+
+        function displayResults(scte35Messages, playlistInfo, url) {
+            const resultsDiv = document.getElementById('results');
+            let html = '';
+
+            // แสดงข้อมูล playlist
+            html += `
+                <div class="playlist-info">
+                    <h4>📋 ข้อมูล Playlist</h4>
+                    <div class="scte35-detail">URL: ${url}</div>
+                    <div class="scte35-detail">Version: ${playlistInfo.version || 'N/A'}</div>
+                    <div class="scte35-detail">Target Duration: ${playlistInfo.targetDuration || 'N/A'} วินาที</div>
+                    <div class="scte35-detail">Media Sequence: ${playlistInfo.mediaSequence || 'N/A'}</div>
+                    <div class="scte35-detail">Playlist Type: ${playlistInfo.playlistType || 'N/A'}</div>
+                    <div class="scte35-detail">จำนวน Segments: ${playlistInfo.segmentCount}</div>
+                    <div class="scte35-detail">เวลาที่ตรวจสอบ: ${new Date().toLocaleString('th-TH')}</div>
+                </div>
+            `;
+
+            html += '<h3>🎯 SCTE-35 Messages ที่พบ</h3>';
+
+            if (scte35Messages.length === 0) {
+                html += '<div class="no-scte35">🔍 ไม่พบ SCTE-35 messages ใน playlist นี้</div>';
+            } else {
+                scte35Messages.forEach((msg, index) => {
+                    html += `
+                        <div class="scte35-item">
+                            <h4>📺 ${msg.type} #${index + 1}</h4>
+                            <div class="scte35-detail">บรรทัดที่: ${msg.position}</div>
+                            <div class="scte35-detail">คำสั่ง: ${msg.line}</div>
+                            ${msg.duration ? `<div class="scte35-detail">ระยะเวลา: ${msg.duration} วินาที</div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        }
+
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            
+            if (checkbox.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+
+        function startAutoRefresh() {
+            countdownSeconds = 5;
+            updateCountdown();
+            
+            autoRefreshInterval = setInterval(() => {
+                checkSCTE35();
+                countdownSeconds = 5;
+            }, 5000);
+            
+            countdownInterval = setInterval(() => {
+                countdownSeconds--;
+                updateCountdown();
+                if (countdownSeconds <= 0) {
+                    countdownSeconds = 5;
+                }
+            }, 1000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            document.getElementById('countdown').textContent = '';
+        }
+
+        function updateCountdown() {
+            const countdownElement = document.getElementById('countdown');
+            if (countdownElement) {
+                countdownElement.textContent = `(รีเฟรชใน ${countdownSeconds} วินาที)`;
+            }
+        }
+
+        // ตรวจสอบอัตโนมัติเมื่อโหลดหน้า
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const url = urlParams.get('url');
+            if (url) {
+                document.getElementById('hlsUrl').value = url;
+                checkSCTE35();
+            }
+        });
+    </script>
+</body>
+</html>
