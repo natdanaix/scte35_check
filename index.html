@@ -248,6 +248,69 @@
             font-style: italic;
             font-size: 1.1em;
         }
+
+        .history-section {
+            margin-top: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .history-entry {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #6c757d;
+        }
+
+        .history-entry.latest {
+            border-left-color: #28a745;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1);
+        }
+
+        .history-meta {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 8px;
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .message-summary {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+
+        .message-count {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .scte35-data-preview {
+            font-family: monospace;
+            font-size: 11px;
+            background: #f1f3f4;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            margin: 2px 0;
+            word-break: break-all;
+            max-width: 100%;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -260,7 +323,7 @@
         <div class="input-section">
             <div class="input-group">
                 <input type="url" id="hlsUrl" placeholder="ใส่ URL ของ HLS playlist (.m3u8)" 
-                       value="https://example.com/playlist.m3u8">
+                       value="https://stream.gmmz.uk/upload-hls/pptv/playlist.m3u8">
             </div>
             <div class="btn-group">
                 <button class="btn btn-primary" onclick="checkSCTE35()">
@@ -285,6 +348,8 @@
         let autoRefreshInterval = null;
         let countdownInterval = null;
         let countdownSeconds = 5;
+        let historyLog = [];
+        let maxHistoryEntries = 20;
 
         function showStatus(message, type = 'info') {
             const statusDiv = document.getElementById('status');
@@ -304,6 +369,91 @@
             }
             document.getElementById('autoRefresh').checked = false;
             document.getElementById('countdown').textContent = '';
+        }
+
+        function clearHistory() {
+            historyLog = [];
+            if (document.getElementById('results').style.display === 'block') {
+                const currentResults = document.getElementById('results').innerHTML;
+                // เอาส่วน history ออก แล้วใส่ส่วนอื่นกลับไป
+                const historyIndex = currentResults.indexOf('<h3>📜 History Log');
+                if (historyIndex !== -1) {
+                    document.getElementById('results').innerHTML = currentResults.substring(0, historyIndex);
+                }
+            }
+        }
+
+        function addToHistory(scte35Messages, url) {
+            const timestamp = new Date();
+            const entry = {
+                timestamp: timestamp,
+                url: url,
+                scte35Count: scte35Messages.length,
+                messages: scte35Messages.map(msg => ({
+                    type: msg.type,
+                    line: msg.line,
+                    duration: msg.duration,
+                    elapsedTime: msg.elapsedTime,
+                    scte35Data: msg.scte35Data
+                }))
+            };
+            
+            historyLog.unshift(entry);
+            
+            // เก็บแค่ maxHistoryEntries entries ล่าสุด
+            if (historyLog.length > maxHistoryEntries) {
+                historyLog = historyLog.slice(0, maxHistoryEntries);
+            }
+        }
+
+        function generateHistorySection() {
+            if (historyLog.length === 0) {
+                return '';
+            }
+
+            let html = `
+                <h3>📜 History Log (${historyLog.length} entries)</h3>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-secondary" onclick="clearHistory()" style="font-size: 14px; padding: 8px 15px;">
+                        🗑️ ล้าง History
+                    </button>
+                </div>
+            `;
+
+            historyLog.forEach((entry, index) => {
+                const timeStr = entry.timestamp.toLocaleString('th-TH');
+                const messageTypes = entry.messages.reduce((acc, msg) => {
+                    acc[msg.type] = (acc[msg.type] || 0) + 1;
+                    return acc;
+                }, {});
+
+                html += `
+                    <div class="scte35-item" style="border-left: 4px solid ${index === 0 ? '#28a745' : '#6c757d'};">
+                        <h4>⏰ ${timeStr}</h4>
+                        <div class="scte35-detail">พบ SCTE-35: ${entry.scte35Count} messages</div>
+                `;
+
+                if (entry.scte35Count > 0) {
+                    Object.entries(messageTypes).forEach(([type, count]) => {
+                        html += `<div class="scte35-detail">• ${type}: ${count} ครั้ง</div>`;
+                    });
+
+                    // แสดง messages ล่าสุดแค่ 3 รายการ
+                    const recentMessages = entry.messages.slice(0, 3);
+                    html += '<div style="margin-top: 10px; font-size: 12px; color: #6c757d;">';
+                    recentMessages.forEach(msg => {
+                        html += `<div style="margin: 2px 0; font-family: monospace; background: #f8f9fa; padding: 2px 4px; border-radius: 3px;">${msg.line.substring(0, 80)}${msg.line.length > 80 ? '...' : ''}</div>`;
+                    });
+                    if (entry.messages.length > 3) {
+                        html += `<div style="font-style: italic;">และอีก ${entry.messages.length - 3} messages...</div>`;
+                    }
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            });
+
+            return html;
         }
 
         async function fetchWithCORS(url) {
@@ -377,11 +527,42 @@
                     });
                 }
                 
+                // ตรวจสอบ EXT-X-CUE-OUT-CONT
+                if (line.startsWith('#EXT-X-CUE-OUT-CONT:')) {
+                    const elapsedMatch = line.match(/ElapsedTime=([0-9.]+)/);
+                    const durationMatch = line.match(/Duration=([0-9.]+)/);
+                    const scte35Match = line.match(/SCTE35=([^,\s]+)/);
+                    
+                    const elapsedTime = elapsedMatch ? parseFloat(elapsedMatch[1]) : null;
+                    const duration = durationMatch ? parseFloat(durationMatch[1]) : null;
+                    const scte35Data = scte35Match ? scte35Match[1] : null;
+                    
+                    scte35Messages.push({
+                        type: 'CUE-OUT-CONT (Ad Break Continuation)',
+                        line: line,
+                        elapsedTime: elapsedTime,
+                        duration: duration,
+                        scte35Data: scte35Data,
+                        position: i + 1
+                    });
+                }
+                
                 // ตรวจสอบ EXT-X-CUE-IN
                 if (line.startsWith('#EXT-X-CUE-IN')) {
                     scte35Messages.push({
                         type: 'CUE-IN (Return to Program)',
                         line: line,
+                        position: i + 1
+                    });
+                }
+                
+                // ตรวจสอบ EXT-OATCLS-SCTE35
+                if (line.startsWith('#EXT-OATCLS-SCTE35:')) {
+                    const scte35Data = line.substring('#EXT-OATCLS-SCTE35:'.length);
+                    scte35Messages.push({
+                        type: 'OATCLS-SCTE35 (Custom SCTE35)',
+                        line: line,
+                        scte35Data: scte35Data,
                         position: i + 1
                     });
                 }
@@ -498,10 +679,16 @@
                             <div class="scte35-detail">บรรทัดที่: ${msg.position}</div>
                             <div class="scte35-detail">คำสั่ง: ${msg.line}</div>
                             ${msg.duration ? `<div class="scte35-detail">ระยะเวลา: ${msg.duration} วินาที</div>` : ''}
+                            ${msg.elapsedTime !== null && msg.elapsedTime !== undefined ? `<div class="scte35-detail">เวลาที่ผ่านไป: ${msg.elapsedTime} วินาที</div>` : ''}
+                            ${msg.scte35Data ? `<div class="scte35-detail">SCTE35 Data: <code style="background: #f1f3f4; padding: 2px 4px; border-radius: 3px; font-size: 12px; word-break: break-all;">${msg.scte35Data}</code></div>` : ''}
                         </div>
                     `;
                 });
             }
+
+            // เพิ่ม History Log
+            addToHistory(scte35Messages, url);
+            html += generateHistorySection();
 
             resultsDiv.innerHTML = html;
             resultsDiv.style.display = 'block';
