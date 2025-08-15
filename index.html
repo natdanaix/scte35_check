@@ -136,6 +136,32 @@
             color: #000;
         }
 
+        .terminal-btn.test-btn {
+            background: #007bff !important;
+            color: #fff !important;
+        }
+
+        .terminal-btn.test-btn:hover {
+            background: #0056b3 !important;
+        }
+
+        .stop-alert-btn {
+            background: #cc3333 !important;
+            color: #fff !important;
+            border: 1px solid #aa2222 !important;
+            animation: blink-red 1s linear infinite;
+            font-weight: bold;
+        }
+
+        .stop-alert-btn:hover {
+            background: #aa2222 !important;
+        }
+
+        @keyframes blink-red {
+            0%, 50% { background: #cc3333; }
+            51%, 100% { background: #aa2222; }
+        }
+
         .terminal-output {
             flex: 1;
             background: #000;
@@ -211,6 +237,27 @@
         .status-right {
             display: flex;
             gap: 15px;
+        }
+
+        #audioStatus {
+            font-weight: bold;
+        }
+
+        #audioStatus.ready {
+            color: #00ff00;
+        }
+
+        #audioStatus.warning {
+            color: #ffff00;
+        }
+
+        #audioStatus.error {
+            color: #ff0000;
+        }
+
+        #audioStatus.alerting {
+            color: #ff4444;
+            animation: blink 1s linear infinite;
         }
 
         .blinking {
@@ -352,6 +399,8 @@
                 <button class="terminal-btn" onclick="startMonitoring()">START</button>
                 <button class="terminal-btn" onclick="stopMonitoring()">STOP</button>
                 <button class="terminal-btn" onclick="clearTerminal()">CLEAR</button>
+                <button class="terminal-btn stop-alert-btn" id="stopAlertBtn" onclick="stopAudioAlert()" 
+                        style="display: none;" title="Stop Continuous Audio Alert">🔇 STOP ALERT</button>
                 <button class="clear-history-btn" onclick="clearUrlHistory()" title="Clear URL History">🗑️</button>
             </div>
         </div>
@@ -382,6 +431,7 @@
                            min="0" max="100" value="50" title="Volume">
                 </div>
                 <div id="connectionStatus">Status: Stopped</div>
+                <div id="audioStatus">Audio: Ready</div>
                 <div id="urlHistoryCount">URLs: 0</div>
             </div>
             <div class="status-right">
@@ -397,8 +447,9 @@
     </div>
 
     <div class="audio-indicator" id="audioIndicator">
-        🚨 SCTE-35 DETECTED 🚨<br>
-        <span style="font-size: 14px;">♪ ♪ ♪</span>
+        🚨 SCTE-35 ALERT ACTIVE 🚨<br>
+        <span style="font-size: 14px;">🔊 Audio playing continuously...</span><br>
+        <span style="font-size: 12px;">Click STOP ALERT to silence</span>
     </div>
 
     <script>
@@ -411,113 +462,406 @@
         
         // SCTE-35 Audio Alert System
         let audioContext = null;
+        let fallbackAudio = null; // HTML5 Audio fallback
         let hasScte35Signal = false;  // ติดตามสถานะ SCTE-35 ปัจจุบัน
         let previousScte35State = false;  // สถานะ SCTE-35 ครั้งที่แล้ว
+        let audioAlertInterval = null;  // interval สำหรับเสียงแจ้งเตือนต่อเนื่อง
+        let isAudioAlertPlaying = false;  // สถานะเสียงแจ้งเตือน
+        let audioInitialized = false;
         
         // URL History Management with localStorage
         let urlHistory = [];
         const MAX_URL_HISTORY = 20;
         const STORAGE_KEY = 'scte35_url_history';
         
-        // Initialize Audio Context
+        // Initialize Audio Context with fallback
         function initAudioContext() {
             try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                return true;
-            } catch (error) {
-                logToTerminal('Audio not supported in this browser', 'error');
-                return false;
-            }
-        }
-        
-        // Create notification sound (3 beeps)
-        function playNotificationSound() {
-            if (!audioContext || !document.getElementById('audioAlert').checked) {
-                return;
-            }
-            
-            try {
-                // Resume audio context if suspended
+                // Try Web Audio API first
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Resume if suspended
                 if (audioContext.state === 'suspended') {
                     audioContext.resume();
                 }
                 
-                const volume = document.getElementById('volumeSlider').value / 100;
-                
-                // Play 3 beeps with intervals
-                for (let i = 0; i < 3; i++) {
-                    setTimeout(() => {
-                        playBeep(volume, i);
-                    }, i * 600); // 600ms interval between beeps
+                // Create fallback HTML5 Audio
+                if (!fallbackAudio) {
+                    fallbackAudio = new Audio();
+                    fallbackAudio.preload = 'auto';
                 }
                 
-                // Show visual indicator
-                showAudioIndicator();
+                audioInitialized = true;
+                document.getElementById('audioStatus').textContent = 'Audio: ✅ Ready';
+                document.getElementById('audioStatus').style.color = '#00ff00';
+                logToTerminal('🔊 Audio system initialized successfully', 'success');
+                return true;
                 
             } catch (error) {
-                console.error('Audio playback error:', error);
+                logToTerminal('⚠️ Web Audio API failed, trying fallback...', 'error');
+                
+                // Fallback to HTML5 Audio only
+                try {
+                    if (!fallbackAudio) {
+                        fallbackAudio = new Audio();
+                        fallbackAudio.preload = 'auto';
+                    }
+                    audioInitialized = true;
+                    document.getElementById('audioStatus').textContent = 'Audio: ⚠️ Fallback';
+                    document.getElementById('audioStatus').style.color = '#ffff00';
+                    logToTerminal('🔊 Audio fallback mode enabled', 'info');
+                    return true;
+                } catch (fallbackError) {
+                    document.getElementById('audioStatus').textContent = 'Audio: ❌ Failed';
+                    document.getElementById('audioStatus').style.color = '#ff0000';
+                    logToTerminal('❌ Audio not supported in this browser', 'error');
+                    return false;
+                }
             }
         }
         
-        // Play single beep
-        function playBeep(volume, beepNumber) {
+        // Force audio initialization with user interaction
+        function forceAudioInit() {
+            // Create a silent audio context interaction
             try {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
+                if (!audioInitialized) {
+                    initAudioContext();
+                }
                 
-                // Connect nodes
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
+                // Play silent sound to unlock audio
+                if (audioContext) {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                }
                 
-                // Configure sound - Different pitch for each beep
-                const frequencies = [800, 900, 1000]; // Ascending tones
-                oscillator.frequency.setValueAtTime(frequencies[beepNumber], audioContext.currentTime);
-                oscillator.type = 'sine';
-                
-                // Volume envelope
-                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(volume * 0.4, audioContext.currentTime + 0.05);
-                gainNode.gain.linearRampToValueAtTime(volume * 0.3, audioContext.currentTime + 0.15);
-                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
-                
-                // Play sound
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-                
+                logToTerminal('🔓 Audio unlocked by user interaction', 'success');
+                return true;
             } catch (error) {
-                console.error('Beep playback error:', error);
+                logToTerminal('❌ Failed to unlock audio: ' + error.message, 'error');
+                return false;
             }
         }
         
-        // Show visual audio indicator (extended for 3 beeps)
-        function showAudioIndicator() {
+        // Create beep sound using data URL (fallback method)
+        function createBeepDataURL() {
+            const sampleRate = 44100;
+            const frequency = 1000;
+            const duration = 0.5;
+            const samples = Math.floor(sampleRate * duration);
+            const dataArray = new Float32Array(samples);
+            
+            for (let i = 0; i < samples; i++) {
+                dataArray[i] = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.3;
+            }
+            
+            // Convert to WAV format (simplified)
+            const buffer = new ArrayBuffer(44 + samples * 2);
+            const view = new DataView(buffer);
+            
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + samples * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, samples * 2, true);
+            
+            // Convert float samples to 16-bit PCM
+            let offset = 44;
+            for (let i = 0; i < samples; i++) {
+                const sample = Math.max(-1, Math.min(1, dataArray[i]));
+                view.setInt16(offset, sample * 0x7FFF, true);
+                offset += 2;
+            }
+            
+            const blob = new Blob([view], { type: 'audio/wav' });
+            return URL.createObjectURL(blob);
+        }
+        
+        // Start continuous notification sound
+        function startContinuousAlert() {
+            if (!document.getElementById('audioAlert').checked || isAudioAlertPlaying) {
+                return;
+            }
+            
+            // Force audio initialization if not done
+            if (!audioInitialized) {
+                forceAudioInit();
+            }
+            
+            try {
+                isAudioAlertPlaying = true;
+                document.getElementById('stopAlertBtn').style.display = 'inline-block';
+                document.getElementById('audioStatus').textContent = 'Audio: 🚨 ALERTING';
+                
+                // เล่นเสียงทันที
+                playContinuousBeep();
+                
+                // ตั้ง interval เล่นเสียงทุก 1 วินาที
+                audioAlertInterval = setInterval(() => {
+                    if (isAudioAlertPlaying) {
+                        playContinuousBeep();
+                    }
+                }, 1000);
+                
+                // Show visual indicator
+                showContinuousAudioIndicator();
+                
+            } catch (error) {
+                logToTerminal('Audio playback error: ' + error.message, 'error');
+                document.getElementById('audioStatus').textContent = 'Audio: ❌ Error';
+            }
+        }
+        
+        // Stop continuous notification sound
+        function stopAudioAlert() {
+            isAudioAlertPlaying = false;
+            
+            if (audioAlertInterval) {
+                clearInterval(audioAlertInterval);
+                audioAlertInterval = null;
+            }
+            
+            document.getElementById('stopAlertBtn').style.display = 'none';
+            document.getElementById('audioStatus').textContent = audioInitialized ? 'Audio: ✅ Ready' : 'Audio: ❌ Failed';
+            hideContinuousAudioIndicator();
+            
+            logToTerminal('🔇 Audio alert stopped manually', 'info');
+        }
+        
+        // Play single continuous beep with multiple fallback methods
+        function playContinuousBeep() {
+            if (!isAudioAlertPlaying) return;
+            
+            const volume = document.getElementById('volumeSlider').value / 100;
+            let played = false;
+            
+            // Method 1: Web Audio API
+            if (audioContext && audioContext.state !== 'suspended') {
+                try {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+                    oscillator.type = 'square';
+                    
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(volume * 0.5, audioContext.currentTime + 0.02);
+                    gainNode.gain.linearRampToValueAtTime(volume * 0.4, audioContext.currentTime + 0.3);
+                    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.5);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                    played = true;
+                    
+                } catch (error) {
+                    console.error('Web Audio API error:', error);
+                }
+            }
+            
+            // Method 2: HTML5 Audio fallback
+            if (!played && fallbackAudio) {
+                try {
+                    if (!fallbackAudio.src) {
+                        fallbackAudio.src = createBeepDataURL();
+                    }
+                    fallbackAudio.volume = volume;
+                    fallbackAudio.currentTime = 0;
+                    fallbackAudio.play().catch(e => {
+                        console.error('HTML5 Audio error:', e);
+                        playFinalFallbackBeep();
+                    });
+                    played = true;
+                } catch (error) {
+                    console.error('Fallback audio error:', error);
+                }
+            }
+            
+            // Method 3: Final fallback using speechSynthesis
+            if (!played) {
+                playFinalFallbackBeep();
+            }
+        }
+        
+        // Final fallback using Speech Synthesis API
+        function playFinalFallbackBeep() {
+            try {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance('beep');
+                    utterance.rate = 3;
+                    utterance.pitch = 2;
+                    utterance.volume = document.getElementById('volumeSlider').value / 100;
+                    speechSynthesis.speak(utterance);
+                }
+            } catch (error) {
+                console.error('Speech synthesis error:', error);
+                // Final fallback - visual only
+                document.getElementById('audioStatus').textContent = 'Audio: 📳 Visual Only';
+            }
+        }
+        
+        // Test sound (single beep for testing)
+        function playTestSound() {
+            if (!document.getElementById('audioAlert').checked) {
+                return;
+            }
+            
+            // Force audio initialization
+            if (!audioInitialized) {
+                forceAudioInit();
+            }
+            
+            const volume = document.getElementById('volumeSlider').value / 100;
+            let played = false;
+            
+            // Try Web Audio API first
+            if (audioContext) {
+                try {
+                    if (audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+                    oscillator.type = 'square';
+                    
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(volume * 0.5, audioContext.currentTime + 0.02);
+                    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                    played = true;
+                    
+                    document.getElementById('audioStatus').textContent = 'Audio: ✅ Ready';
+                    
+                } catch (error) {
+                    console.error('Test audio error:', error);
+                }
+            }
+            
+            // Fallback to HTML5 Audio
+            if (!played && fallbackAudio) {
+                try {
+                    if (!fallbackAudio.src) {
+                        fallbackAudio.src = createBeepDataURL();
+                    }
+                    fallbackAudio.volume = volume;
+                    fallbackAudio.currentTime = 0;
+                    fallbackAudio.play().then(() => {
+                        document.getElementById('audioStatus').textContent = 'Audio: ⚠️ Fallback';
+                    }).catch(e => {
+                        playFinalFallbackBeep();
+                    });
+                } catch (error) {
+                    playFinalFallbackBeep();
+                }
+            }
+            
+            if (!played) {
+                playFinalFallbackBeep();
+            }
+            
+            // Show brief test indicator
+            showTestAudioIndicator();
+        }
+        
+        // Show continuous visual audio indicator
+        function showContinuousAudioIndicator() {
             const indicator = document.getElementById('audioIndicator');
+            indicator.innerHTML = `
+                🚨 SCTE-35 ALERT ACTIVE 🚨<br>
+                <span style="font-size: 14px;">🔊 Audio playing continuously...</span><br>
+                <span style="font-size: 12px;">Click STOP ALERT to silence</span>
+            `;
+            indicator.classList.add('show');
+        }
+        
+        // Hide continuous visual audio indicator
+        function hideContinuousAudioIndicator() {
+            const indicator = document.getElementById('audioIndicator');
+            indicator.classList.remove('show');
+        }
+        
+        // Show brief test audio indicator
+        function showTestAudioIndicator() {
+            const indicator = document.getElementById('audioIndicator');
+            const originalContent = indicator.innerHTML;
+            const volume = document.getElementById('volumeSlider').value;
+            
+            indicator.innerHTML = `
+                🔊 AUDIO TEST 🔊<br>
+                <span style="font-size: 14px;">Volume: ${volume}%</span><br>
+                <span style="font-size: 12px;">Did you hear the beep?</span>
+            `;
             indicator.classList.add('show');
             
-            // Keep indicator visible for duration of 3 beeps (about 2 seconds)
             setTimeout(() => {
                 indicator.classList.remove('show');
-            }, 2200);
+                setTimeout(() => {
+                    indicator.innerHTML = originalContent;
+                }, 300);
+            }, 2000);
+            
+            // Also log to terminal
+            logToTerminal(`🔊 Audio test played at ${volume}% volume`, 'info');
+            if (!audioInitialized) {
+                logToTerminal('⚠️ If you didn\'t hear anything, try clicking anywhere on the page first', 'error');
+            }
         }
         
         // Check if should trigger audio alert
         function checkAudioTrigger(currentHasScte35) {
             // Trigger เมื่อ:
-            // 1. ไม่เคยมี SCTE-35 และตอนนี้มี (ครั้งแรก)
-            // 2. เคยมีแล้วหายไป และตอนนี้กลับมาใหม่
+            // 1. ไม่เคยมี SCTE-35 และตอนนี้มี (ครั้งแรก) → เริ่มเสียงต่อเนื่อง
+            // 2. เคยมีแล้วหายไป และตอนนี้กลับมาใหม่ → เริ่มเสียงต่อเนื่อง
+            // 3. มี SCTE-35 แล้วหายไป → หยุดเสียง
             
             if (currentHasScte35 && !previousScte35State) {
-                // SCTE-35 signal detected (new or returning)
-                playNotificationSound(); // จะเล่น 3 ครั้ง
+                // SCTE-35 signal detected (new or returning) → Start continuous alert
+                startContinuousAlert();
                 
                 if (!hasScte35Signal) {
-                    logToTerminal('🚨 SCTE-35 Signal DETECTED - First time! (3 beeps)', 'success');
+                    logToTerminal('🚨 SCTE-35 Signal DETECTED - Starting continuous alert!', 'success');
                 } else {
-                    logToTerminal('🚨 SCTE-35 Signal RETURNED! (3 beeps)', 'success');
+                    logToTerminal('🚨 SCTE-35 Signal RETURNED - Starting continuous alert!', 'success');
                 }
             } else if (!currentHasScte35 && previousScte35State) {
-                // SCTE-35 signal lost
-                logToTerminal('📻 SCTE-35 Signal lost', 'info');
+                // SCTE-35 signal lost → Stop continuous alert
+                if (isAudioAlertPlaying) {
+                    stopAudioAlert();
+                    logToTerminal('📻 SCTE-35 Signal lost - Audio alert stopped automatically', 'info');
+                } else {
+                    logToTerminal('📻 SCTE-35 Signal lost', 'info');
+                }
             }
             
             // อัปเดตสถานะ
@@ -915,13 +1259,17 @@
             hasScte35Signal = false;
             previousScte35State = false;
             
-            // Initialize audio context
+            // Force initialize audio context
             if (document.getElementById('audioAlert').checked) {
-                if (initAudioContext()) {
-                    logToTerminal('🔊 Audio alerts enabled', 'success');
-                } else {
-                    logToTerminal('⚠️ Audio alerts not available', 'error');
-                }
+                forceAudioInit();
+                // Test audio to make sure it works
+                setTimeout(() => {
+                    if (audioInitialized) {
+                        logToTerminal('🔊 Audio system ready for alerts', 'success');
+                    } else {
+                        logToTerminal('⚠️ Audio may not work - click TEST button to verify', 'error');
+                    }
+                }, 500);
             }
 
             // Auto-save URL to history
@@ -959,6 +1307,12 @@
             // Reset SCTE-35 state
             hasScte35Signal = false;
             previousScte35State = false;
+            
+            // Stop audio alert if playing
+            if (isAudioAlertPlaying) {
+                stopAudioAlert();
+                logToTerminal('Audio alert stopped (monitoring ended)', 'info');
+            }
 
             if (monitoringInterval) {
                 clearInterval(monitoringInterval);
@@ -1017,7 +1371,7 @@
             
             // Play test sound when adjusting volume
             if (audioContext && document.getElementById('audioAlert').checked) {
-                playNotificationSound();
+                playTestSound();
             }
         });
 
@@ -1075,8 +1429,15 @@
                 e.preventDefault();
                 // Test audio
                 if (document.getElementById('audioAlert').checked) {
-                    playNotificationSound();
+                    playTestSound();
                     logToTerminal('🔊 Audio test triggered', 'info');
+                }
+            }
+            if (e.ctrlKey && e.key === 'x') {
+                e.preventDefault();
+                // Stop audio alert
+                if (isAudioAlertPlaying) {
+                    stopAudioAlert();
                 }
             }
         });
@@ -1090,15 +1451,29 @@
         // Initial setup
         loadUrlHistory();
         
-        // Test audio on first user interaction
-        document.addEventListener('click', function initAudio() {
-            if (document.getElementById('audioAlert').checked) {
-                initAudioContext();
+        // Initialize audio on ANY user interaction
+        let audioInitAttempted = false;
+        function attemptAudioInit() {
+            if (!audioInitAttempted) {
+                audioInitAttempted = true;
+                forceAudioInit();
             }
-            document.removeEventListener('click', initAudio);
-        }, { once: true });
+        }
         
-       
+        // Listen for multiple types of user interaction
+        ['click', 'touchstart', 'keydown', 'mouseover'].forEach(eventType => {
+            document.addEventListener(eventType, attemptAudioInit, { once: true });
+        });
+        
+        // Force audio init on page load after delay
+        setTimeout(() => {
+            if (!audioInitialized) {
+                logToTerminal('⚡ Attempting to initialize audio...', 'info');
+                forceAudioInit();
+            }
+        }, 1000);
+        
+   
     </script>
 </body>
 </html>
