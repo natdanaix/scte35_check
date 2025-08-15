@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCTE-35 HLS Checker</title>
+    <title>SCTE-35 HLS Monitor Terminal</title>
     <style>
         * {
             margin: 0;
@@ -12,460 +12,801 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+            background: #000;
+            color: #00ff00;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 15px;
-            color: white;
-        }
-
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
-        }
-
-        .input-section {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            border: 2px solid #e9ecef;
-        }
-
-        .input-group {
+        .terminal-container {
+            height: 100vh;
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            background: #000;
         }
 
-        .input-group input {
-            flex: 1;
-            min-width: 300px;
-            padding: 12px 15px;
-            border: 2px solid #dee2e6;
-            border-radius: 10px;
+        .terminal-header {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 10px 20px;
+            border-bottom: 2px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .terminal-title {
             font-size: 16px;
-            transition: border-color 0.3s ease;
+            font-weight: bold;
         }
 
-        .input-group input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
-        }
-
-        .btn-group {
+        .terminal-controls {
             display: flex;
             gap: 10px;
+            align-items: center;
             flex-wrap: wrap;
         }
 
-        .btn {
-            padding: 12px 25px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-            transform: translateY(-2px);
-        }
-
-        .status {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-weight: 600;
-            text-align: center;
-        }
-
-        .status.info {
-            background: #cce7ff;
-            border: 2px solid #007bff;
-            color: #0056b3;
-        }
-
-        .status.success {
-            background: #d4edda;
-            border: 2px solid #28a745;
-            color: #155724;
-        }
-
-        .status.error {
-            background: #f8d7da;
-            border: 2px solid #dc3545;
-            color: #721c24;
-        }
-
-        .status.warning {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            color: #856404;
-        }
-
-        .results {
-            background: #ffffff;
-            border-radius: 15px;
-            padding: 25px;
-            border: 2px solid #e9ecef;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-
-        .results h3 {
-            color: #495057;
-            margin-bottom: 20px;
-            font-size: 1.4em;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-
-        .scte35-item {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border: 2px solid #dee2e6;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            transition: transform 0.2s ease;
-        }
-
-        .scte35-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-        }
-
-        .scte35-item h4 {
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 1.2em;
-        }
-
-        .scte35-detail {
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 5px 0;
-            border-left: 4px solid #667eea;
-            font-family: monospace;
-            font-size: 14px;
-        }
-
-        .auto-refresh {
+        .url-input-group {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-top: 15px;
+            gap: 5px;
         }
 
-        .auto-refresh input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-        }
-
-        .countdown {
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-left: 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .playlist-info {
-            background: #e3f2fd;
-            border: 2px solid #2196f3;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-
-        .playlist-info h4 {
-            color: #1976d2;
-            margin-bottom: 10px;
-        }
-
-        .no-scte35 {
-            text-align: center;
-            padding: 40px;
-            color: #6c757d;
-            font-style: italic;
-            font-size: 1.1em;
-        }
-
-        .history-section {
-            margin-top: 30px;
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 20px;
-            border: 2px solid #e9ecef;
-        }
-
-        .history-entry {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid #6c757d;
-        }
-
-        .history-entry.latest {
-            border-left-color: #28a745;
-            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1);
-        }
-
-        .history-meta {
+        .terminal-input {
+            background: #111;
+            color: #00ff00;
+            border: 1px solid #333;
+            padding: 5px 10px;
+            font-family: inherit;
             font-size: 12px;
-            color: #6c757d;
-            margin-top: 8px;
-            font-family: monospace;
-            background: #f8f9fa;
-            padding: 4px 8px;
-            border-radius: 4px;
-            max-height: 100px;
-            overflow-y: auto;
+            width: 350px;
         }
 
-        .message-summary {
+        .terminal-input:focus {
+            outline: none;
+            border-color: #00ff00;
+        }
+
+        .url-dropdown {
+            background: #111;
+            color: #00ff00;
+            border: 1px solid #333;
+            padding: 5px;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            width: 200px;
+        }
+
+        .url-dropdown:focus {
+            outline: none;
+            border-color: #00ff00;
+        }
+
+        .save-url-btn {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 5px 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+            transition: background 0.2s;
+        }
+
+        .save-url-btn:hover {
+            background: #555;
+        }
+
+        .clear-history-btn {
+            background: #cc3333;
+            color: #fff;
+            border: 1px solid #aa2222;
+            padding: 5px 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+            transition: background 0.2s;
+        }
+
+        .clear-history-btn:hover {
+            background: #aa2222;
+        }
+
+        .terminal-btn {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .terminal-btn:hover {
+            background: #555;
+        }
+
+        .terminal-btn.active {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .terminal-output {
+            flex: 1;
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .terminal-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-output::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .log-separator {
+            color: #ffff00;
+            font-weight: bold;
+            margin: 10px 0 5px 0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 2px;
+        }
+
+        .scte35-message {
+            color: #00ffff;
+            margin: 2px 0;
+            padding-left: 10px;
+        }
+
+        .error-message {
+            color: #ff0000;
+            margin: 2px 0;
+        }
+
+        .info-message {
+            color: #ffff00;
+            margin: 2px 0;
+        }
+
+        .success-message {
+            color: #00ff00;
+            margin: 2px 0;
+        }
+
+        .status-bar {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 5px 20px;
+            border-top: 1px solid #333;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-right {
             display: flex;
             gap: 15px;
-            flex-wrap: wrap;
-            margin: 8px 0;
+        }
+
+        .blinking {
+            animation: blink 1s linear infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 12px;
+            height: 12px;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .volume-slider {
+            width: 60px;
+            height: 12px;
+            background: #333;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .volume-slider:hover {
+            opacity: 1;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #00ff00;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            background: #00ff00;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .audio-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 255, 0, 0.9);
+            color: #000;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            display: none;
+            z-index: 1000;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .audio-indicator.show {
+            display: block;
+            animation: pulse 0.5s ease-in-out;
         }
 
         .message-count {
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
+            color: #ff8800;
+            font-weight: bold;
         }
 
-        .scte35-data-preview {
-            font-family: monospace;
+        .auto-scroll-indicator {
+            position: fixed;
+            bottom: 60px;
+            right: 20px;
+            background: rgba(0, 255, 0, 0.8);
+            color: #000;
+            padding: 5px 10px;
             font-size: 11px;
-            background: #f1f3f4;
-            padding: 4px 6px;
             border-radius: 4px;
-            border: 1px solid #dee2e6;
-            margin: 2px 0;
-            word-break: break-all;
-            max-width: 100%;
-            overflow: hidden;
+            display: none;
+        }
+
+        .terminal-prompt {
+            color: #00ff00;
+            margin: 5px 0;
+        }
+
+        .terminal-prompt::before {
+            content: "$ ";
+            color: #ffff00;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🎬 SCTE-35 HLS Checker</h1>
-            <p>ตรวจสอบ SCTE-35 messages จาก HLS playlist</p>
-        </div>
-
-        <div class="input-section">
-            <div class="input-group">
-                <input type="url" id="hlsUrl" placeholder="ใส่ URL ของ HLS playlist (.m3u8)" 
-                       value="https://stream.gmmz.uk/upload-hls/pptv/playlist.m3u8">
-            </div>
-            <div class="btn-group">
-                <button class="btn btn-primary" onclick="checkSCTE35()">
-                    🔍 ตรวจสอบ SCTE-35
-                </button>
-                <button class="btn btn-secondary" onclick="clearResults()">
-                    🧹 ล้างผลลัพธ์
-                </button>
-            </div>
-            <div class="auto-refresh">
-                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
-                <label for="autoRefresh">รีเฟรชอัตโนมัติทุก 5 วินาที</label>
-                <span id="countdown" class="countdown"></span>
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <div class="terminal-title">🎬 SCTE-35 HLS Monitor Terminal v1.0</div>
+            <div class="terminal-controls">
+                <div class="url-input-group">
+                    <input type="url" id="hlsUrl" class="terminal-input" 
+                           placeholder="HLS playlist URL (.m3u8)">
+                    <button class="save-url-btn" onclick="saveCurrentUrl()" title="Save URL">💾</button>
+                </div>
+                <select id="urlHistory" class="url-dropdown" onchange="loadSelectedUrl()">
+                    <option value="">📂 Saved URLs</option>
+                </select>
+                <button class="terminal-btn" onclick="exportUrls()" title="Export URLs">📥</button>
+                <button class="terminal-btn" onclick="importUrls()" title="Import URLs">📤</button>
+                <button class="terminal-btn" onclick="startMonitoring()">START</button>
+                <button class="terminal-btn" onclick="stopMonitoring()">STOP</button>
+                <button class="terminal-btn" onclick="clearTerminal()">CLEAR</button>
+                <button class="clear-history-btn" onclick="clearUrlHistory()" title="Clear URL History">🗑️</button>
             </div>
         </div>
 
-        <div id="status"></div>
-        <div id="results" class="results" style="display: none;"></div>
+        <div class="terminal-output" id="terminalOutput">
+            <div class="info-message">SCTE-35 HLS Monitor Terminal</div>
+            <div class="info-message">Enter HLS playlist URL and click START to begin monitoring...</div>
+            <div class="terminal-prompt">Ready</div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="autoRefresh" checked>
+                    <label for="autoRefresh">Auto-refresh (5s)</label>
+                </div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="autoScroll" checked>
+                    <label for="autoScroll">Auto-scroll</label>
+                </div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="audioAlert" checked>
+                    <label for="audioAlert">🔊 Audio Alert</label>
+                </div>
+                <div class="volume-control">
+                    <span style="font-size: 10px;">Vol:</span>
+                    <input type="range" id="volumeSlider" class="volume-slider" 
+                           min="0" max="100" value="50" title="Volume">
+                </div>
+                <div id="connectionStatus">Status: Stopped</div>
+                <div id="urlHistoryCount">URLs: 0</div>
+            </div>
+            <div class="status-right">
+                <div id="messageCount">Messages: 0</div>
+                <div id="lastUpdate">Last update: Never</div>
+                <div id="countdown"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="auto-scroll-indicator" id="autoScrollIndicator">
+        📜 Auto-scrolling...
+    </div>
+
+    <div class="audio-indicator" id="audioIndicator">
+        🚨 SCTE-35 DETECTED 🚨<br>
+        <span style="font-size: 14px;">♪ ♪ ♪</span>
     </div>
 
     <script>
-        let autoRefreshInterval = null;
+        let monitoringInterval = null;
         let countdownInterval = null;
         let countdownSeconds = 5;
-        let historyLog = [];
-        let maxHistoryEntries = 20;
-
-        function showStatus(message, type = 'info') {
-            const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
-        }
-
-        function clearResults() {
-            document.getElementById('results').style.display = 'none';
-            document.getElementById('status').innerHTML = '';
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
+        let isMonitoring = false;
+        let totalMessages = 0;
+        let currentUrl = '';
+        
+        // SCTE-35 Audio Alert System
+        let audioContext = null;
+        let hasScte35Signal = false;  // ติดตามสถานะ SCTE-35 ปัจจุบัน
+        let previousScte35State = false;  // สถานะ SCTE-35 ครั้งที่แล้ว
+        
+        // URL History Management with localStorage
+        let urlHistory = [];
+        const MAX_URL_HISTORY = 20;
+        const STORAGE_KEY = 'scte35_url_history';
+        
+        // Initialize Audio Context
+        function initAudioContext() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                return true;
+            } catch (error) {
+                logToTerminal('Audio not supported in this browser', 'error');
+                return false;
             }
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
-            }
-            document.getElementById('autoRefresh').checked = false;
-            document.getElementById('countdown').textContent = '';
         }
-
-        function clearHistory() {
-            historyLog = [];
-            if (document.getElementById('results').style.display === 'block') {
-                const currentResults = document.getElementById('results').innerHTML;
-                // เอาส่วน history ออก แล้วใส่ส่วนอื่นกลับไป
-                const historyIndex = currentResults.indexOf('<h3>📜 History Log');
-                if (historyIndex !== -1) {
-                    document.getElementById('results').innerHTML = currentResults.substring(0, historyIndex);
+        
+        // Create notification sound (3 beeps)
+        function playNotificationSound() {
+            if (!audioContext || !document.getElementById('audioAlert').checked) {
+                return;
+            }
+            
+            try {
+                // Resume audio context if suspended
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
                 }
+                
+                const volume = document.getElementById('volumeSlider').value / 100;
+                
+                // Play 3 beeps with intervals
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        playBeep(volume, i);
+                    }, i * 600); // 600ms interval between beeps
+                }
+                
+                // Show visual indicator
+                showAudioIndicator();
+                
+            } catch (error) {
+                console.error('Audio playback error:', error);
             }
         }
-
-        function addToHistory(scte35Messages, url) {
-            const timestamp = new Date();
-            const entry = {
-                timestamp: timestamp,
+        
+        // Play single beep
+        function playBeep(volume, beepNumber) {
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                // Connect nodes
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                // Configure sound - Different pitch for each beep
+                const frequencies = [800, 900, 1000]; // Ascending tones
+                oscillator.frequency.setValueAtTime(frequencies[beepNumber], audioContext.currentTime);
+                oscillator.type = 'sine';
+                
+                // Volume envelope
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(volume * 0.4, audioContext.currentTime + 0.05);
+                gainNode.gain.linearRampToValueAtTime(volume * 0.3, audioContext.currentTime + 0.15);
+                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+                
+                // Play sound
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+                
+            } catch (error) {
+                console.error('Beep playback error:', error);
+            }
+        }
+        
+        // Show visual audio indicator (extended for 3 beeps)
+        function showAudioIndicator() {
+            const indicator = document.getElementById('audioIndicator');
+            indicator.classList.add('show');
+            
+            // Keep indicator visible for duration of 3 beeps (about 2 seconds)
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2200);
+        }
+        
+        // Check if should trigger audio alert
+        function checkAudioTrigger(currentHasScte35) {
+            // Trigger เมื่อ:
+            // 1. ไม่เคยมี SCTE-35 และตอนนี้มี (ครั้งแรก)
+            // 2. เคยมีแล้วหายไป และตอนนี้กลับมาใหม่
+            
+            if (currentHasScte35 && !previousScte35State) {
+                // SCTE-35 signal detected (new or returning)
+                playNotificationSound(); // จะเล่น 3 ครั้ง
+                
+                if (!hasScte35Signal) {
+                    logToTerminal('🚨 SCTE-35 Signal DETECTED - First time! (3 beeps)', 'success');
+                } else {
+                    logToTerminal('🚨 SCTE-35 Signal RETURNED! (3 beeps)', 'success');
+                }
+            } else if (!currentHasScte35 && previousScte35State) {
+                // SCTE-35 signal lost
+                logToTerminal('📻 SCTE-35 Signal lost', 'info');
+            }
+            
+            // อัปเดตสถานะ
+            previousScte35State = currentHasScte35;
+            if (currentHasScte35) {
+                hasScte35Signal = true;
+            }
+        }
+        
+        function loadUrlHistory() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    urlHistory = JSON.parse(saved);
+                    logToTerminal(`✅ Loaded ${urlHistory.length} URLs from localStorage`, 'success');
+                } else {
+                    urlHistory = [];
+                    logToTerminal('📝 No saved URLs found, starting fresh', 'info');
+                }
+                updateUrlDropdown();
+            } catch (error) {
+                logToTerminal('⚠️ localStorage not available - URLs will only persist during this session', 'error');
+                logToTerminal('💡 To enable persistent storage, copy this code to a local HTML file', 'info');
+                urlHistory = [];
+                updateUrlDropdown();
+            }
+        }
+        
+        function saveUrlHistory() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(urlHistory));
+            } catch (error) {
+                logToTerminal('Warning: Could not save URL history (localStorage not available)', 'error');
+            }
+        }
+        
+        function addUrlToHistory(url) {
+            if (!url || url.trim() === '') return;
+            
+            // Remove if already exists
+            urlHistory = urlHistory.filter(item => item.url !== url);
+            
+            // Add to beginning
+            urlHistory.unshift({
                 url: url,
-                scte35Count: scte35Messages.length,
-                messages: scte35Messages.map(msg => ({
-                    type: msg.type,
-                    line: msg.line,
-                    duration: msg.duration,
-                    elapsedTime: msg.elapsedTime,
-                    scte35Data: msg.scte35Data
-                }))
+                timestamp: new Date().toISOString(),
+                name: generateUrlName(url)
+            });
+            
+            // Keep only MAX_URL_HISTORY items
+            if (urlHistory.length > MAX_URL_HISTORY) {
+                urlHistory = urlHistory.slice(0, MAX_URL_HISTORY);
+            }
+            
+            saveUrlHistory();
+            updateUrlDropdown();
+        }
+        
+        function generateUrlName(url) {
+            try {
+                const urlObj = new URL(url);
+                const hostname = urlObj.hostname;
+                const pathname = urlObj.pathname;
+                const filename = pathname.split('/').pop() || 'playlist.m3u8';
+                return `${hostname}/${filename}`;
+            } catch (error) {
+                return url.substring(0, 50) + (url.length > 50 ? '...' : '');
+            }
+        }
+        
+        function updateUrlDropdown() {
+            const dropdown = document.getElementById('urlHistory');
+            dropdown.innerHTML = '<option value="">📂 Saved URLs (' + urlHistory.length + ')</option>';
+            
+            urlHistory.forEach((item, index) => {
+                const option = document.createElement('option');
+                option.value = item.url;
+                
+                // แสดงวันที่บันทึก
+                const date = new Date(item.timestamp);
+                const dateStr = date.toLocaleDateString('th-TH', { 
+                    month: 'short', 
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                option.textContent = `${index + 1}. ${item.name} (${dateStr})`;
+                option.title = `${item.url}\nSaved: ${date.toLocaleString('th-TH')}`;
+                dropdown.appendChild(option);
+            });
+            
+            // Update status bar
+            const urlHistoryCount = document.getElementById('urlHistoryCount');
+            if (urlHistoryCount) {
+                urlHistoryCount.textContent = `URLs: ${urlHistory.length}/${MAX_URL_HISTORY}`;
+            }
+        }
+        
+        function saveCurrentUrl() {
+            const url = document.getElementById('hlsUrl').value.trim();
+            if (!url) {
+                logToTerminal('Please enter a URL to save', 'error');
+                return;
+            }
+            
+            if (urlHistory.some(item => item.url === url)) {
+                logToTerminal(`URL already exists in history: ${generateUrlName(url)}`, 'info');
+                return;
+            }
+            
+            addUrlToHistory(url);
+            logToTerminal(`URL saved to history: ${generateUrlName(url)}`, 'success');
+        }
+        
+        function loadSelectedUrl() {
+            const dropdown = document.getElementById('urlHistory');
+            const selectedUrl = dropdown.value;
+            
+            if (selectedUrl) {
+                document.getElementById('hlsUrl').value = selectedUrl;
+                logToTerminal(`Loaded URL: ${generateUrlName(selectedUrl)}`, 'info');
+                
+                // Reset dropdown selection
+                dropdown.selectedIndex = 0;
+            }
+        }
+        
+        function clearUrlHistory() {
+            if (urlHistory.length === 0) {
+                logToTerminal('URL history is already empty', 'info');
+                return;
+            }
+            
+            const count = urlHistory.length;
+            urlHistory = [];
+            saveUrlHistory();
+            updateUrlDropdown();
+            logToTerminal(`Cleared ${count} URLs from history`, 'info');
+        }
+
+        function exportUrls() {
+            if (urlHistory.length === 0) {
+                logToTerminal('No URLs to export', 'info');
+                return;
+            }
+
+            const exportData = {
+                version: '1.0',
+                exported: new Date().toISOString(),
+                urls: urlHistory
             };
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
             
-            historyLog.unshift(entry);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `scte35-urls-${new Date().toISOString().slice(0, 10)}.json`;
+            link.click();
             
-            // เก็บแค่ maxHistoryEntries entries ล่าสุด
-            if (historyLog.length > maxHistoryEntries) {
-                historyLog = historyLog.slice(0, maxHistoryEntries);
+            URL.revokeObjectURL(url);
+            logToTerminal(`Exported ${urlHistory.length} URLs to file`, 'success');
+        }
+
+        function importUrls() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const importData = JSON.parse(e.target.result);
+                        
+                        if (!importData.urls || !Array.isArray(importData.urls)) {
+                            throw new Error('Invalid file format');
+                        }
+
+                        let importedCount = 0;
+                        importData.urls.forEach(item => {
+                            if (item.url && item.name && item.timestamp) {
+                                // Check if URL doesn't already exist
+                                if (!urlHistory.some(existing => existing.url === item.url)) {
+                                    urlHistory.push(item);
+                                    importedCount++;
+                                }
+                            }
+                        });
+
+                        // Keep only MAX_URL_HISTORY items
+                        if (urlHistory.length > MAX_URL_HISTORY) {
+                            urlHistory = urlHistory.slice(0, MAX_URL_HISTORY);
+                        }
+
+                        saveUrlHistory();
+                        updateUrlDropdown();
+                        logToTerminal(`Imported ${importedCount} new URLs from file`, 'success');
+                        
+                    } catch (error) {
+                        logToTerminal(`Import failed: ${error.message}`, 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        const terminalOutput = document.getElementById('terminalOutput');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const messageCount = document.getElementById('messageCount');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const countdownDisplay = document.getElementById('countdown');
+        const autoScrollIndicator = document.getElementById('autoScrollIndicator');
+
+        function logToTerminal(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `${type}-message`;
+            div.textContent = message;
+            
+            terminalOutput.appendChild(div);
+            
+            if (document.getElementById('autoScroll').checked) {
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                showAutoScrollIndicator();
             }
         }
 
-        function generateHistorySection() {
-            if (historyLog.length === 0) {
-                return '';
-            }
-
-            let html = `
-                <h3>📜 History Log (${historyLog.length} entries)</h3>
-                <div style="margin-bottom: 15px;">
-                    <button class="btn btn-secondary" onclick="clearHistory()" style="font-size: 14px; padding: 8px 15px;">
-                        🗑️ ล้าง History
-                    </button>
-                </div>
-            `;
-
-            historyLog.forEach((entry, index) => {
-                const timeStr = entry.timestamp.toLocaleString('th-TH');
-                const messageTypes = entry.messages.reduce((acc, msg) => {
-                    acc[msg.type] = (acc[msg.type] || 0) + 1;
-                    return acc;
-                }, {});
-
-                html += `
-                    <div class="scte35-item" style="border-left: 4px solid ${index === 0 ? '#28a745' : '#6c757d'};">
-                        <h4>⏰ ${timeStr}</h4>
-                        <div class="scte35-detail">พบ SCTE-35: ${entry.scte35Count} messages</div>
-                `;
-
-                if (entry.scte35Count > 0) {
-                    Object.entries(messageTypes).forEach(([type, count]) => {
-                        html += `<div class="scte35-detail">• ${type}: ${count} ครั้ง</div>`;
-                    });
-
-                    // แสดง messages ล่าสุดแค่ 3 รายการ
-                    const recentMessages = entry.messages.slice(0, 3);
-                    html += '<div style="margin-top: 10px; font-size: 12px; color: #6c757d;">';
-                    recentMessages.forEach(msg => {
-                        html += `<div style="margin: 2px 0; font-family: monospace; background: #f8f9fa; padding: 2px 4px; border-radius: 3px;">${msg.line.substring(0, 80)}${msg.line.length > 80 ? '...' : ''}</div>`;
-                    });
-                    if (entry.messages.length > 3) {
-                        html += `<div style="font-style: italic;">และอีก ${entry.messages.length - 3} messages...</div>`;
-                    }
-                    html += '</div>';
-                }
-
-                html += '</div>';
+        function logSeparator() {
+            const now = new Date();
+            
+            // Format: Fri Aug 15 06:49:39 +07 2025
+            const weekday = now.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Bangkok' });
+            const month = now.toLocaleDateString('en-US', { month: 'short', timeZone: 'Asia/Bangkok' });
+            const day = now.getDate().toString().padStart(2, '0');
+            const time = now.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                timeZone: 'Asia/Bangkok'
             });
+            const year = now.getFullYear();
+            
+            const timestamp = `${weekday} ${month} ${day} ${time} +07 ${year}`;
 
-            return html;
+            const div = document.createElement('div');
+            div.className = 'log-separator';
+            div.textContent = `=== ${timestamp} ===`;
+            
+            terminalOutput.appendChild(div);
+            
+            if (document.getElementById('autoScroll').checked) {
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            }
+        }
+
+        function logSCTE35Message(message) {
+            const div = document.createElement('div');
+            div.className = 'scte35-message';
+            div.textContent = message;
+            
+            terminalOutput.appendChild(div);
+            totalMessages++;
+            
+            if (document.getElementById('autoScroll').checked) {
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            }
+        }
+
+        function showAutoScrollIndicator() {
+            autoScrollIndicator.style.display = 'block';
+            setTimeout(() => {
+                autoScrollIndicator.style.display = 'none';
+            }, 1000);
         }
 
         async function fetchWithCORS(url) {
             try {
-                // พยายาม fetch โดยตรงก่อน
                 const response = await fetch(url);
                 if (response.ok) {
                     return await response.text();
                 }
                 throw new Error('Direct fetch failed');
             } catch (error) {
-                // ถ้าไม่ได้ ให้ใช้ CORS proxy
                 const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
                 try {
                     const response = await fetch(proxyUrl);
@@ -474,11 +815,10 @@
                     }
                     return await response.text();
                 } catch (proxyError) {
-                    // ลองใช้ proxy อื่น
                     const altProxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
                     const altResponse = await fetch(altProxyUrl);
                     if (!altResponse.ok) {
-                        throw new Error('ไม่สามารถดาวน์โหลด playlist ได้ เนื่องจาก CORS policy');
+                        throw new Error('Cannot download playlist due to CORS policy');
                     }
                     const data = await altResponse.json();
                     return data.contents;
@@ -486,270 +826,279 @@
             }
         }
 
-        function parseSCTE35(playlistContent) {
+        function extractSCTE35Messages(playlistContent) {
             const lines = playlistContent.split('\n');
-            const scte35Messages = [];
-            let currentSegment = null;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                
-                // ตรวจสอบ EXT-X-SCTE35-OUT
-                if (line.startsWith('#EXT-X-SCTE35-OUT:')) {
-                    const match = line.match(/DURATION=([0-9.]+)/);
-                    const duration = match ? parseFloat(match[1]) : null;
-                    scte35Messages.push({
-                        type: 'SCTE35-OUT (Ad Break Start)',
-                        line: line,
-                        duration: duration,
-                        position: i + 1
-                    });
-                }
-                
-                // ตรวจสอบ EXT-X-SCTE35-IN
-                if (line.startsWith('#EXT-X-SCTE35-IN')) {
-                    scte35Messages.push({
-                        type: 'SCTE35-IN (Ad Break End)',
-                        line: line,
-                        position: i + 1
-                    });
-                }
-                
-                // ตรวจสอบ EXT-X-CUE-OUT
-                if (line.startsWith('#EXT-X-CUE-OUT:')) {
-                    const match = line.match(/([0-9.]+)/);
-                    const duration = match ? parseFloat(match[1]) : null;
-                    scte35Messages.push({
-                        type: 'CUE-OUT (Ad Break)',
-                        line: line,
-                        duration: duration,
-                        position: i + 1
-                    });
-                }
-                
-                // ตรวจสอบ EXT-X-CUE-OUT-CONT
-                if (line.startsWith('#EXT-X-CUE-OUT-CONT:')) {
-                    const elapsedMatch = line.match(/ElapsedTime=([0-9.]+)/);
-                    const durationMatch = line.match(/Duration=([0-9.]+)/);
-                    const scte35Match = line.match(/SCTE35=([^,\s]+)/);
-                    
-                    const elapsedTime = elapsedMatch ? parseFloat(elapsedMatch[1]) : null;
-                    const duration = durationMatch ? parseFloat(durationMatch[1]) : null;
-                    const scte35Data = scte35Match ? scte35Match[1] : null;
-                    
-                    scte35Messages.push({
-                        type: 'CUE-OUT-CONT (Ad Break Continuation)',
-                        line: line,
-                        elapsedTime: elapsedTime,
-                        duration: duration,
-                        scte35Data: scte35Data,
-                        position: i + 1
-                    });
-                }
-                
-                // ตรวจสอบ EXT-X-CUE-IN
-                if (line.startsWith('#EXT-X-CUE-IN')) {
-                    scte35Messages.push({
-                        type: 'CUE-IN (Return to Program)',
-                        line: line,
-                        position: i + 1
-                    });
-                }
-                
-                // ตรวจสอบ EXT-OATCLS-SCTE35
-                if (line.startsWith('#EXT-OATCLS-SCTE35:')) {
-                    const scte35Data = line.substring('#EXT-OATCLS-SCTE35:'.length);
-                    scte35Messages.push({
-                        type: 'OATCLS-SCTE35 (Custom SCTE35)',
-                        line: line,
-                        scte35Data: scte35Data,
-                        position: i + 1
-                    });
-                }
-                
-                // ตรวจสอบ EXT-X-DATERANGE
-                if (line.startsWith('#EXT-X-DATERANGE:')) {
-                    if (line.includes('SCTE35-OUT') || line.includes('SCTE35-IN') || line.includes('SCTE35-CMD')) {
-                        scte35Messages.push({
-                            type: 'DATERANGE SCTE35',
-                            line: line,
-                            position: i + 1
-                        });
-                    }
-                }
-                
-                // ตรวจสอบ segment files
-                if (line.endsWith('.ts') || line.endsWith('.m4s')) {
-                    currentSegment = line;
-                }
-            }
-
-            return scte35Messages;
-        }
-
-        function getPlaylistInfo(playlistContent) {
-            const lines = playlistContent.split('\n');
-            const info = {
-                version: null,
-                targetDuration: null,
-                mediaSequence: null,
-                segmentCount: 0,
-                playlistType: null
-            };
+            const messages = [];
 
             for (const line of lines) {
-                if (line.startsWith('#EXT-X-VERSION:')) {
-                    info.version = line.split(':')[1];
-                } else if (line.startsWith('#EXT-X-TARGETDURATION:')) {
-                    info.targetDuration = line.split(':')[1];
-                } else if (line.startsWith('#EXT-X-MEDIA-SEQUENCE:')) {
-                    info.mediaSequence = line.split(':')[1];
-                } else if (line.startsWith('#EXT-X-PLAYLIST-TYPE:')) {
-                    info.playlistType = line.split(':')[1];
-                } else if (line.endsWith('.ts') || line.endsWith('.m4s')) {
-                    info.segmentCount++;
+                const trimmedLine = line.trim();
+                
+                if (trimmedLine.startsWith('#EXT-X-SCTE35-OUT:') ||
+                    trimmedLine.startsWith('#EXT-X-SCTE35-IN') ||
+                    trimmedLine.startsWith('#EXT-X-CUE-OUT:') ||
+                    trimmedLine.startsWith('#EXT-X-CUE-OUT-CONT:') ||
+                    trimmedLine.startsWith('#EXT-X-CUE-IN') ||
+                    trimmedLine.startsWith('#EXT-OATCLS-SCTE35:') ||
+                    (trimmedLine.startsWith('#EXT-X-DATERANGE:') && 
+                     (trimmedLine.includes('SCTE35-OUT') || trimmedLine.includes('SCTE35-IN') || trimmedLine.includes('SCTE35-CMD')))) {
+                    messages.push(trimmedLine);
                 }
             }
 
-            return info;
+            return messages;
         }
 
-        async function checkSCTE35() {
+        async function checkPlaylist() {
+            if (!currentUrl) return;
+
+            try {
+                connectionStatus.textContent = 'Status: Fetching...';
+                connectionStatus.className = 'blinking';
+
+                const playlistContent = await fetchWithCORS(currentUrl);
+                
+                if (!playlistContent.includes('#EXTM3U')) {
+                    throw new Error('Invalid M3U8 playlist format');
+                }
+
+                const scte35Messages = extractSCTE35Messages(playlistContent);
+                const currentHasScte35 = scte35Messages.length > 0;
+                
+                // Check audio trigger before logging
+                checkAudioTrigger(currentHasScte35);
+                
+                // แสดง separator ทุกครั้งที่เช็ค
+                logSeparator();
+                
+                // แสดง SCTE-35 messages ถ้ามี
+                if (scte35Messages.length > 0) {
+                    scte35Messages.forEach(message => {
+                        logSCTE35Message(message);
+                    });
+                }
+                // ถ้าไม่มี SCTE-35 messages ก็ไม่ต้องแสดงอะไรเพิ่ม (แค่ timestamp)
+
+                connectionStatus.textContent = 'Status: Connected';
+                connectionStatus.className = '';
+                lastUpdate.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+                messageCount.innerHTML = `Messages: <span class="message-count">${totalMessages}</span>`;
+
+            } catch (error) {
+                logSeparator();
+                logToTerminal(`Error: ${error.message}`, 'error');
+                connectionStatus.textContent = 'Status: Error';
+                connectionStatus.className = '';
+                
+                // Reset SCTE-35 state on error
+                checkAudioTrigger(false);
+            }
+        }
+
+        function startMonitoring() {
             const url = document.getElementById('hlsUrl').value.trim();
             
             if (!url) {
-                showStatus('❌ กรุณาใส่ URL ของ HLS playlist', 'error');
+                logToTerminal('Please enter HLS playlist URL', 'error');
                 return;
             }
 
-            showStatus('🔄 กำลังดาวน์โหลดและตรวจสอบ playlist... <span class="loading"></span>', 'info');
+            if (isMonitoring) {
+                logToTerminal('Monitoring already started', 'info');
+                return;
+            }
 
-            try {
-                const playlistContent = await fetchWithCORS(url);
-                
-                if (!playlistContent.includes('#EXTM3U')) {
-                    throw new Error('ไฟล์ที่ดาวน์โหลดไม่ใช่ M3U8 playlist ที่ถูกต้อง');
-                }
-
-                const scte35Messages = parseSCTE35(playlistContent);
-                const playlistInfo = getPlaylistInfo(playlistContent);
-                
-                displayResults(scte35Messages, playlistInfo, url);
-                
-                if (scte35Messages.length > 0) {
-                    showStatus(`✅ พบ SCTE-35 messages จำนวน ${scte35Messages.length} รายการ`, 'success');
+            currentUrl = url;
+            isMonitoring = true;
+            totalMessages = 0;
+            
+            // Reset SCTE-35 state
+            hasScte35Signal = false;
+            previousScte35State = false;
+            
+            // Initialize audio context
+            if (document.getElementById('audioAlert').checked) {
+                if (initAudioContext()) {
+                    logToTerminal('🔊 Audio alerts enabled', 'success');
                 } else {
-                    showStatus('⚠️ ไม่พบ SCTE-35 messages ใน playlist นี้', 'warning');
+                    logToTerminal('⚠️ Audio alerts not available', 'error');
                 }
-
-            } catch (error) {
-                console.error('Error:', error);
-                showStatus(`❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
-                document.getElementById('results').style.display = 'none';
-            }
-        }
-
-        function displayResults(scte35Messages, playlistInfo, url) {
-            const resultsDiv = document.getElementById('results');
-            let html = '';
-
-            // แสดงข้อมูล playlist
-            html += `
-                <div class="playlist-info">
-                    <h4>📋 ข้อมูล Playlist</h4>
-                    <div class="scte35-detail">URL: ${url}</div>
-                    <div class="scte35-detail">Version: ${playlistInfo.version || 'N/A'}</div>
-                    <div class="scte35-detail">Target Duration: ${playlistInfo.targetDuration || 'N/A'} วินาที</div>
-                    <div class="scte35-detail">Media Sequence: ${playlistInfo.mediaSequence || 'N/A'}</div>
-                    <div class="scte35-detail">Playlist Type: ${playlistInfo.playlistType || 'N/A'}</div>
-                    <div class="scte35-detail">จำนวน Segments: ${playlistInfo.segmentCount}</div>
-                    <div class="scte35-detail">เวลาที่ตรวจสอบ: ${new Date().toLocaleString('th-TH')}</div>
-                </div>
-            `;
-
-            html += '<h3>🎯 SCTE-35 Messages ที่พบ</h3>';
-
-            if (scte35Messages.length === 0) {
-                html += '<div class="no-scte35">🔍 ไม่พบ SCTE-35 messages ใน playlist นี้</div>';
-            } else {
-                scte35Messages.forEach((msg, index) => {
-                    html += `
-                        <div class="scte35-item">
-                            <h4>📺 ${msg.type} #${index + 1}</h4>
-                            <div class="scte35-detail">บรรทัดที่: ${msg.position}</div>
-                            <div class="scte35-detail">คำสั่ง: ${msg.line}</div>
-                            ${msg.duration ? `<div class="scte35-detail">ระยะเวลา: ${msg.duration} วินาที</div>` : ''}
-                            ${msg.elapsedTime !== null && msg.elapsedTime !== undefined ? `<div class="scte35-detail">เวลาที่ผ่านไป: ${msg.elapsedTime} วินาที</div>` : ''}
-                            ${msg.scte35Data ? `<div class="scte35-detail">SCTE35 Data: <code style="background: #f1f3f4; padding: 2px 4px; border-radius: 3px; font-size: 12px; word-break: break-all;">${msg.scte35Data}</code></div>` : ''}
-                        </div>
-                    `;
-                });
             }
 
-            // เพิ่ม History Log
-            addToHistory(scte35Messages, url);
-            html += generateHistorySection();
+            // Auto-save URL to history
+            addUrlToHistory(url);
 
-            resultsDiv.innerHTML = html;
-            resultsDiv.style.display = 'block';
-        }
+            logToTerminal(`Starting monitoring: ${url}`, 'success');
+            logToTerminal('Auto-refresh enabled (5 seconds interval)', 'info');
 
-        function toggleAutoRefresh() {
-            const checkbox = document.getElementById('autoRefresh');
-            
-            if (checkbox.checked) {
-                startAutoRefresh();
-            } else {
-                stopAutoRefresh();
-            }
-        }
+            // เริ่มตรวจสอบทันที
+            checkPlaylist();
 
-        function startAutoRefresh() {
-            countdownSeconds = 5;
-            updateCountdown();
-            
-            autoRefreshInterval = setInterval(() => {
-                checkSCTE35();
-                countdownSeconds = 5;
-            }, 5000);
-            
-            countdownInterval = setInterval(() => {
-                countdownSeconds--;
-                updateCountdown();
-                if (countdownSeconds <= 0) {
+            // ตั้ง interval สำหรับการตรวจสอบอัตโนมัติ
+            if (document.getElementById('autoRefresh').checked) {
+                startCountdown();
+                monitoringInterval = setInterval(() => {
+                    checkPlaylist();
                     countdownSeconds = 5;
-                }
-            }, 1000);
+                }, 5000);
+            }
+
+            // เปลี่ยนสีปุ่ม
+            const startBtn = document.querySelector('.terminal-btn');
+            startBtn.classList.add('active');
         }
 
-        function stopAutoRefresh() {
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
+        function stopMonitoring() {
+            if (!isMonitoring) {
+                logToTerminal('Monitoring not started', 'info');
+                return;
             }
+
+            isMonitoring = false;
+            currentUrl = '';
+            
+            // Reset SCTE-35 state
+            hasScte35Signal = false;
+            previousScte35State = false;
+
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+            }
+
             if (countdownInterval) {
                 clearInterval(countdownInterval);
                 countdownInterval = null;
             }
-            document.getElementById('countdown').textContent = '';
+
+            logToTerminal('Monitoring stopped', 'info');
+            connectionStatus.textContent = 'Status: Stopped';
+            countdownDisplay.textContent = '';
+
+            // เอาสีปุ่มออก
+            const startBtn = document.querySelector('.terminal-btn');
+            startBtn.classList.remove('active');
         }
 
-        function updateCountdown() {
-            const countdownElement = document.getElementById('countdown');
-            if (countdownElement) {
-                countdownElement.textContent = `(รีเฟรชใน ${countdownSeconds} วินาที)`;
-            }
+        function clearTerminal() {
+            terminalOutput.innerHTML = `
+                <div class="info-message">Terminal cleared</div>
+                <div class="terminal-prompt">Ready</div>
+            `;
+            totalMessages = 0;
+            messageCount.innerHTML = 'Messages: 0';
         }
 
-        // ตรวจสอบอัตโนมัติเมื่อโหลดหน้า
-        window.addEventListener('load', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const url = urlParams.get('url');
-            if (url) {
-                document.getElementById('hlsUrl').value = url;
-                checkSCTE35();
+        function startCountdown() {
+            countdownSeconds = 5;
+            countdownInterval = setInterval(() => {
+                countdownSeconds--;
+                if (countdownSeconds <= 0) {
+                    countdownSeconds = 5;
+                }
+                countdownDisplay.textContent = `Next check: ${countdownSeconds}s`;
+            }, 1000);
+        }
+
+        // Audio alert toggle
+        document.getElementById('audioAlert').addEventListener('change', function() {
+            if (this.checked) {
+                if (initAudioContext()) {
+                    logToTerminal('🔊 Audio alerts enabled', 'info');
+                }
+            } else {
+                logToTerminal('🔇 Audio alerts disabled', 'info');
             }
         });
+
+        // Volume control
+        document.getElementById('volumeSlider').addEventListener('input', function() {
+            const volume = this.value;
+            this.title = `Volume: ${volume}%`;
+            
+            // Play test sound when adjusting volume
+            if (audioContext && document.getElementById('audioAlert').checked) {
+                playNotificationSound();
+            }
+        });
+
+        // Auto-refresh toggle
+        document.getElementById('autoRefresh').addEventListener('change', function() {
+            if (isMonitoring) {
+                if (this.checked) {
+                    if (!monitoringInterval) {
+                        startCountdown();
+                        monitoringInterval = setInterval(() => {
+                            checkPlaylist();
+                            countdownSeconds = 5;
+                        }, 5000);
+                        logToTerminal('Auto-refresh enabled', 'info');
+                    }
+                } else {
+                    if (monitoringInterval) {
+                        clearInterval(monitoringInterval);
+                        monitoringInterval = null;
+                    }
+                    if (countdownInterval) {
+                        clearInterval(countdownInterval);
+                        countdownInterval = null;
+                    }
+                    countdownDisplay.textContent = '';
+                    logToTerminal('Auto-refresh disabled', 'info');
+                }
+            }
+        });
+
+        // Enter key support
+        document.getElementById('hlsUrl').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (e.ctrlKey) {
+                    // Ctrl+Enter = Save URL
+                    saveCurrentUrl();
+                } else {
+                    // Enter = Start monitoring
+                    startMonitoring();
+                }
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                saveCurrentUrl();
+            }
+            if (e.ctrlKey && e.key === 'h') {
+                e.preventDefault();
+                clearUrlHistory();
+            }
+            if (e.ctrlKey && e.key === 't') {
+                e.preventDefault();
+                // Test audio
+                if (document.getElementById('audioAlert').checked) {
+                    playNotificationSound();
+                    logToTerminal('🔊 Audio test triggered', 'info');
+                }
+            }
+        });
+
+        // Scroll detection
+        terminalOutput.addEventListener('scroll', function() {
+            const isScrolledToBottom = terminalOutput.scrollHeight - terminalOutput.clientHeight <= terminalOutput.scrollTop + 1;
+            document.getElementById('autoScroll').checked = isScrolledToBottom;
+        });
+
+        // Initial setup
+        loadUrlHistory();
+        
+        // Test audio on first user interaction
+        document.addEventListener('click', function initAudio() {
+            if (document.getElementById('audioAlert').checked) {
+                initAudioContext();
+            }
+            document.removeEventListener('click', initAudio);
+        }, { once: true });
+        
+       
     </script>
 </body>
 </html>
